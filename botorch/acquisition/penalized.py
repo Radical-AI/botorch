@@ -162,7 +162,13 @@ def nnz_approx(X: Tensor, target_point: Tensor, a: Tensor) -> Tensor:
 class L0Approximation(torch.nn.Module):
     r"""Differentiable relaxation of the L0 norm using a Gaussian basis function."""
 
-    def __init__(self, target_point: Tensor, a: float = 1.0, **tkwargs: Any) -> None:
+    def __init__(
+        self,
+        target_point: Tensor,
+        a: float = 1.0,
+        lower_bound: Tensor = torch.tensor(0.0),
+        **tkwargs: Any,
+    ) -> None:
         r"""Initializing L0 penalty with differentiable relaxation.
 
         Args:
@@ -171,25 +177,40 @@ class L0Approximation(torch.nn.Module):
         """
         super().__init__()
         self.target_point = target_point
+        self.lower_bound = lower_bound
         # hyperparameter to control the differentiable relaxation in L0 norm function.
         self.register_buffer("a", torch.tensor(a, **tkwargs))
 
     def __call__(self, X: Tensor) -> Tensor:
-        return nnz_approx(X=X, target_point=self.target_point, a=self.a)
+        return (
+            torch.relu(
+                nnz_approx(X=X, target_point=self.target_point, a=self.a)
+                - self.lower_bound
+            )
+            + self.lower_bound
+        )
 
 
 class L0PenaltyApprox(L0Approximation):
     r"""Differentiable relaxation of the L0 norm to be added to any arbitrary
     acquisition function to construct a PenalizedAcquisitionFunction."""
 
-    def __init__(self, target_point: Tensor, a: float = 1.0, **tkwargs: Any) -> None:
+    def __init__(
+        self,
+        target_point: Tensor,
+        a: float = 1.0,
+        lower_bound: Tensor = torch.tensor(0.0),
+        **tkwargs: Any,
+    ) -> None:
         r"""Initializing L0 penalty with differentiable relaxation.
 
         Args:
             target_point: A tensor corresponding to the target point.
             a: A hyperparameter that controls the differentiable relaxation.
         """
-        super().__init__(target_point=target_point, a=a, **tkwargs)
+        super().__init__(
+            target_point=target_point, a=a, lower_bound=lower_bound, **tkwargs
+        )
 
     def __call__(self, X: Tensor) -> Tensor:
         r"""
